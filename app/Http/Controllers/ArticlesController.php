@@ -6,6 +6,7 @@ use App\Article;
 use Illuminate\Http\Request;
 use DB;
 use App\Post;
+use App\Tag;
 
 class ArticlesController extends Controller
 {
@@ -13,7 +14,11 @@ class ArticlesController extends Controller
     public function index()
     {
       // List resourcer
-      $articles = Article::latest()->get();
+      if (request('tag')) {
+        $articles = Tag::where('name', request('tag'))->firstOrFail()->articles;
+      } else {
+        $articles = Article::latest()->get();
+      }
 
       return view('articles.index', ['articles' => $articles]);
     }
@@ -27,7 +32,9 @@ class ArticlesController extends Controller
     public function create()
     {
       // Show a view to create a new resource
-      return view('articles.create');
+      return view('articles.create', [
+        'tags' => Tag::all(),
+      ]);
     }
 
     public function store()
@@ -50,10 +57,14 @@ class ArticlesController extends Controller
       // $article->body = request('body');
 
       // $article->save();
+      $this->validateArticle();
 
-      Article::create($this->validateArticle());
+      $article = new Article(request(['title', 'excerpt', 'body']));
+      $article->user_id = 1;
+      $article->save();
+      $article->tags()->attach(request('tags'));
 
-      return redirect('/articles');
+      return redirect(route('articles.index'));
     }
 
     public function edit(Article $article)
@@ -85,7 +96,7 @@ class ArticlesController extends Controller
 
       $article->update($this->validateArticle());
 
-      return redirect('/articles/' . $article->id);
+      return redirect($article->path());
     }
 
     public function destroy()
@@ -98,7 +109,8 @@ class ArticlesController extends Controller
       return request()->validate([
         'title' => 'required',
         'excerpt' => 'required',
-        'body' => 'required'
+        'body' => 'required',
+        'tags' => 'exists:tags,id'
       ]);
     }
 }
